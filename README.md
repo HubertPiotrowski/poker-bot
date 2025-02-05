@@ -1,25 +1,8 @@
-| code-thing      | status        |
-| --------------- | ------------- |
-| master          | [![Build Status](https://travis-ci.org/fedden/poker_ai.svg?branch=master)](https://travis-ci.org/fedden/poker_ai)  |
-| develop         | [![Build Status](https://travis-ci.org/fedden/poker_ai.svg?branch=develop)](https://travis-ci.org/fedden/poker_ai) |
-| maintainability | [![Maintainability](https://api.codeclimate.com/v1/badges/c5a556dae097b809b4d9/maintainability)](https://codeclimate.com/github/fedden/poker_ai/maintainability) |
-| coverage        | [![Test Coverage](https://api.codeclimate.com/v1/badges/c5a556dae097b809b4d9/test_coverage)](https://codeclimate.com/github/fedden/poker_ai/test_coverage) |
-| license         | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
-
 [Read the documentation]()
 
 # 🤖 Poker AI
 
 This repository will contain a best effort open source implementation of a poker AI using the ideas of Counterfactual Regret.
-
-<p align="center">
-  <img src="https://github.com/fedden/poker_ai/blob/develop/assets/poker.jpg">
-</p>
-
-_Made with love from the developers [Leon](https://www.leonfedden.co.uk) and [Colin](http://www.colinmanko.com/)._
-
-## Join the Community
-[https://thepoker.ai](https://thepoker.ai)
 
 ## Prerequisites
 
@@ -30,13 +13,6 @@ This repository assumes Python 3.7 or newer is used.
 Either install from pypi:
 ```bash
 pip install poker_ai 
-```
-
-Or if you want to dev on our code, install the Python package from source by cloning this repo and `pip -e` installing it:
-```bash
-git clone https://github.com/fedden/poker_ai.git # Though really we should use ssh here!
-cd /path/to/poker_ai
-pip install .
 ```
 
 ## Command Line Interface (CLI)
@@ -330,23 +306,9 @@ _Strengthen the game engine with more tests and allow users to see live visualis
   <img src="https://github.com/fedden/poker_ai/blob/develop/assets/regret.jpeg">
 </p>
 
-## Contributing
-
-This is an open effort and help, criticisms and ideas are all welcome. 
-
-First of all, please check out the [CONTRIBUTING](/CONTRIBUTING.md) guide.
-
-Feel free to start a discussion on the github issues or to reach out to me at leonfedden at gmail dot com. 
-
 ## License
 
 The code is provided under the copy-left GPL licence. If you need it under a more permissive license then please contact me at leonfedden at gmail dot com.
-
-## Stargazers over time
-
-We appreciate you getting this far in the README file! If you like what we are doing, please give us a star and share with your friends! 
-
-[![Stargazers over time](https://starchart.cc/fedden/poker_ai.svg)](https://starchart.cc/fedden/poker_ai)
 
 
 
