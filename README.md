@@ -50,13 +50,46 @@ poker_ai cluster \
   --save_dir "./final_clustering"
 ```
 
-These parameters are optimized based on the Pluribus paper and provide a balance between abstraction quality and computational feasibility. Expected runtime varies by hardware:
+poker_ai cluster \
+  --low_card_rank 2 \
+  --high_card_rank 14 \
+  --n_river_clusters 400 \
+  --n_turn_clusters 300 \
+  --n_flop_clusters 200 \
+  --n_simulations_river 400 \
+  --n_simulations_turn 300 \
+  --n_simulations_flop 200 \
+  --save_dir "./final_clustering"
+
+
+
+
+poker_ai cluster \
+  --low_card_rank 2 \
+  --high_card_rank 14 \
+  --n_river_clusters 1000 \
+  --n_turn_clusters 750 \
+  --n_flop_clusters 500 \
+  --n_simulations_river 1000 \
+  --n_simulations_turn 750 \
+  --n_simulations_flop 500 \
+  --save_dir "./final_clustering"
+
+
+
+These parameters are optimized based on the Pluribus paper and provide a balance between abstraction quality and computational feasibility.
+
+### CPU Utilization
+
+The clustering process automatically utilizes all available CPU cores (configurable via MAX_WORKERS environment variable) and achieves near 100% CPU utilization during intensive computations through efficient parallel processing.
+
+Expected runtime varies by hardware:
 - 10 cores: ~69.4 hours
 - 32 cores: ~21.7 hours
 - 64 cores: ~10.8 hours
 - 80 cores: ~8.7 hours
-- 92 cores: ~7.5 hours
 - 128 cores: ~5.4 hours
+
 
 How to get information on training an agent:
 ```bash

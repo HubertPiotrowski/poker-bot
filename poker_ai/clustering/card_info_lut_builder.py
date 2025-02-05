@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 import concurrent.futures
@@ -90,13 +91,14 @@ class CardInfoLutBuilder(CardCombos):
         """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             self._river_ehs = list(
                 tqdm(
                     executor.map(
                         self.process_river_ehs,
                         self.river,
-                        chunksize=len(self.river) // 160,
+                        chunksize=max(1, len(self.river) // (max_workers * 4)),
                     ),
                     total=len(self.river),
                 )
@@ -114,13 +116,14 @@ class CardInfoLutBuilder(CardCombos):
         """Compute turn clusters and create lookup table."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             self._turn_ehs_distributions = list(
                 tqdm(
                     executor.map(
                         self.process_turn_ehs_distributions,
                         self.turn,
-                        chunksize=len(self.turn) // 160,
+                        chunksize=max(1, len(self.turn) // (max_workers * 4)),
                     ),
                     total=len(self.turn),
                 )
@@ -136,13 +139,14 @@ class CardInfoLutBuilder(CardCombos):
         """Compute flop clusters and create lookup table."""
         log.info("Starting computation of flop clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             self._flop_potential_aware_distributions = list(
                 tqdm(
                     executor.map(
                         self.process_flop_potential_aware_distributions,
                         self.flop,
-                        chunksize=len(self.flop) // 160,
+                        chunksize=max(1, len(self.flop) // (max_workers * 4)),
                     ),
                     total=len(self.flop),
                 )
