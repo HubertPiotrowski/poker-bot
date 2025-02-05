@@ -1,0 +1,16 @@
+blessed>=1.20.0
+click>=8.0.0
+dill>=0.3.9
+enlighten>=1.13.0
+ipdb>=0.13.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+pytest>=7.0.0
+PyYAML>=6.0.0
+rich>=13.0.0
+recommonmark>=0.7.0
+scikit-learn>=1.0.0
+scipy>=1.10.0
+Sphinx>=7.0.0
+sphinx-rtd-theme>=1.0.0
+tqdm>=4.65.0

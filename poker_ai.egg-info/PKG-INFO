@@ -1,3 +1,42 @@
+Metadata-Version: 2.2
+Name: poker_ai
+Version: 0.1.0
+Summary: Open source implementation of a CFR based poker AI player.
+Home-page: https://github.com/fedden/poker_ai
+Author: Leon Fedden, Colin Manko
+Author-email: leonfedden@gmail.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: blessed>=1.20.0
+Requires-Dist: click>=8.0.0
+Requires-Dist: dill>=0.3.9
+Requires-Dist: enlighten>=1.13.0
+Requires-Dist: ipdb>=0.13.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pytest>=7.0.0
+Requires-Dist: PyYAML>=6.0.0
+Requires-Dist: rich>=13.0.0
+Requires-Dist: recommonmark>=0.7.0
+Requires-Dist: scikit-learn>=1.0.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: Sphinx>=7.0.0
+Requires-Dist: sphinx-rtd-theme>=1.0.0
+Requires-Dist: tqdm>=4.65.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 | code-thing      | status        |
 | --------------- | ------------- |
 | master          | [![Build Status](https://travis-ci.org/fedden/poker_ai.svg?branch=master)](https://travis-ci.org/fedden/poker_ai)  |
@@ -404,3 +443,12 @@ Design Patterns and Best Practices
 • Analyze areas where design patterns (Strategy, Factory, Observer, etc.) could simplify complex logic, reduce duplication, and improve maintainability.
 
 • Leverage direct property access and minimize unnecessary variable declarations where clarity isn’t compromised.
+
+1.0.0rc1
+--------
+
+* Adding script to train AI.
+* Adding script to cluster hands.
+* Adding script to RT search on top of offline strategy.
+* Adding Sphinx auto documentation.
+* Adding CLI for all key supported scripts.
