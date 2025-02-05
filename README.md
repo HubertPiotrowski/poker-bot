@@ -29,6 +29,35 @@ You will need to produce some lookup tables that cluster the various information
 poker_ai cluster --help
 ```
 
+### Test Clustering Configuration
+For initial testing and validation, use default parameters:
+```bash
+poker_ai cluster
+```
+
+### Production Clustering Configuration
+For final training with optimal parameters (requires significant computational resources):
+```bash
+poker_ai cluster \
+  --low_card_rank 2 \
+  --high_card_rank 14 \
+  --n_river_clusters 225 \
+  --n_turn_clusters 175 \
+  --n_flop_clusters 125 \
+  --n_simulations_river 125 \
+  --n_simulations_turn 87 \
+  --n_simulations_flop 62 \
+  --save_dir "./final_clustering"
+```
+
+These parameters are optimized based on the Pluribus paper and provide a balance between abstraction quality and computational feasibility. Expected runtime varies by hardware:
+- 10 cores: ~69.4 hours
+- 32 cores: ~21.7 hours
+- 64 cores: ~10.8 hours
+- 80 cores: ~8.7 hours
+- 92 cores: ~7.5 hours
+- 128 cores: ~5.4 hours
+
 How to get information on training an agent:
 ```bash
 poker_ai train start --help
@@ -132,12 +161,12 @@ Below is a rough structure of the codebase.
 ├── applications   # Larger applications like the state visualiser sever.
 ├── paper          # Main source of info and documentation :)
 ├── poker_ai       # Main Python library.
-│   ├── ai         # Stub functions for ai algorithms.
-│   ├── games      # Implementations of poker games as node based objects that
+│   ├── ai         # Stub functions for ai algorithms.
+│   ├── games      # Implementations of poker games as node based objects that
 │   │              # can be traversed in a depth-first recursive manner.
-│   ├── poker      # WIP general code for managing a hand of poker.
-│   ├── terminal   # Code to play against the AI from your console.
-│   └── utils      # Utility code like seed setting.
+│   ├── poker      # WIP general code for managing a hand of poker.
+│   ├── terminal   # Code to play against the AI from your console.
+│   └── utils      # Utility code like seed setting.
 ├── research       # A directory for research/development scripts 
 │                  # to help formulate understanding and ideas.
 └── test           # Python tests.
@@ -311,7 +340,6 @@ _Strengthen the game engine with more tests and allow users to see live visualis
 The code is provided under the copy-left GPL licence. If you need it under a more permissive license then please contact me at leonfedden at gmail dot com.
 
 
-
 TODO:
 Project Structure and Modularity
 
@@ -357,7 +385,7 @@ Frontend Enhancements
 
 Error Handling and Logging
 
-• Standardize error handling by leveraging centralized logging mechanisms (for instance, using Python’s logging module) to produce consistent, actionable logs.
+• Standardize error handling by leveraging centralized logging mechanisms (for instance, using Python's logging module) to produce consistent, actionable logs.
 
 • Ensure that exceptions in critical paths are captured and reported with sufficient context.
 
@@ -365,4 +393,4 @@ Design Patterns and Best Practices
 
 • Analyze areas where design patterns (Strategy, Factory, Observer, etc.) could simplify complex logic, reduce duplication, and improve maintainability.
 
-• Leverage direct property access and minimize unnecessary variable declarations where clarity isn’t compromised.
+• Leverage direct property access and minimize unnecessary variable declarations where clarity isn't compromised.
