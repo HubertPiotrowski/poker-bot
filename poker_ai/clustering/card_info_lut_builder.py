@@ -197,23 +197,25 @@ class CardInfoLutBuilder(CardCombos):
         return self.create_card_lookup(self._river_clusters, self.river)
 
     def _compute_turn_clusters(self, n_turn_clusters: int):
-        """Compute turn clusters and create lookup table."""
+        """Compute turn clusters and create lookup table using ProcessPoolExecutor."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
         max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
         chunk_size = max(1, min(100, len(self.turn) // (max_workers * 4)))  # Limit chunk size
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            self._turn_ehs_distributions = []
-            # Process in smaller batches to manage memory
-            for i in range(0, len(self.turn), chunk_size * max_workers):
-                log.info(f"Processing turn batch from {i} to {i + chunk_size * max_workers}")
-                batch = self.turn[i:i + chunk_size * max_workers]
-                batch_results = list(executor.map(self.process_turn_ehs_distributions, batch, chunksize=chunk_size))
+        from functools import partial
+        ctx = multiprocessing.get_context("spawn")
+        worker_func = partial(process_turn_ehs_worker, cards=self._cards, n_simulations_turn=self.n_simulations_turn)
+        self._turn_ehs_distributions = []
+        effective_batch_size = chunk_size * max_workers
+        total_batches = (len(self.turn) + effective_batch_size - 1) // effective_batch_size
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            for i in tqdm(range(0, len(self.turn), effective_batch_size), desc="Processing turn batches", total=total_batches):
+                batch = self.turn[i:i + effective_batch_size]
+                batch_results = list(executor.map(worker_func, batch, chunksize=chunk_size))
                 self._turn_ehs_distributions.extend(batch_results)
-                log.info(f"Completed turn batch from {i} to {i + chunk_size * max_workers}")
                 gc.collect()  # Force garbage collection after each batch
-                
+
         log.info("Computing turn clusters...")
         centroids, labels = self.advanced_clustering.cluster(
             self._turn_ehs_distributions,
@@ -222,7 +224,6 @@ class CardInfoLutBuilder(CardCombos):
         )
         self.centroids["turn"] = centroids
         self._turn_clusters = labels
-        
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
         return self.create_card_lookup(self._turn_clusters, self.turn)
