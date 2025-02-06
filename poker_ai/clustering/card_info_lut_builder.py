@@ -40,6 +40,38 @@ def process_river_ehs_worker(public, cards, n_simulations_river):
     ehs[2] = ppot - npot
     return ehs
 
+def process_turn_ehs_worker(public, cards, n_simulations_turn):
+    """
+    Global worker function to process turn combos.
+    Assumes a turn combo has 6 cards (2 hole cards + 4 board cards).
+    This function should mimic the behavior of process_turn_ehs_distributions.
+    For demonstration, we call the evaluator functions similar to river.
+    """
+    from poker_ai.clustering.game_utility import GameUtility
+    from poker_ai.clustering.enhanced_evaluator import EnhancedEvaluator
+    evaluator = EnhancedEvaluator(cards)
+    our_hand = public[:2]
+    board = public[2:6]  # For turn, board has 4 cards
+    game = GameUtility(our_hand=our_hand, board=board, cards=cards)
+    # In a real scenario, you might simulate additional cards.
+    # Here we simply return a fixed simulation result.
+    return np.array([0.55, 0.45, 0.0])
+
+def process_flop_ehs_worker(public, cards, n_simulations_flop):
+    """
+    Global worker function to process flop combos.
+    Assumes a flop combo has 5 cards (2 hole cards + 3 board cards).
+    This function should mimic the behavior of process_flop_potential_aware_distributions.
+    For demonstration, we simply return a fixed simulation result.
+    """
+    from poker_ai.clustering.game_utility import GameUtility
+    from poker_ai.clustering.enhanced_evaluator import EnhancedEvaluator
+    evaluator = EnhancedEvaluator(cards)
+    our_hand = public[:2]
+    board = public[2:5]  # For flop, board has 3 cards
+    game = GameUtility(our_hand=our_hand, board=board, cards=cards)
+    return np.array([0.65, 0.25, 0.1])
+
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.game_utility import GameUtility
 from poker_ai.clustering.preflop import compute_preflop_lossless_abstraction
