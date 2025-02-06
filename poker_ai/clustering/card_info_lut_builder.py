@@ -141,13 +141,12 @@ class CardInfoLutBuilder(CardCombos):
         worker_func = partial(process_river_ehs_worker, cards=self._cards, n_simulations_river=self.n_simulations_river)
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
             self._river_ehs = []
-            # Process in smaller batches to manage memory
-            for i in range(0, len(self.river), chunk_size * max_workers):
-                log.info(f"Processing river batch from {i} to {i + chunk_size * max_workers}")
-                batch = self.river[i:i + chunk_size * max_workers]
+            effective_batch_size = chunk_size * max_workers
+            total_batches = (len(self.river) + effective_batch_size - 1) // effective_batch_size
+            for i in tqdm(range(0, len(self.river), effective_batch_size), desc="Processing river batches", total=total_batches):
+                batch = self.river[i:i + effective_batch_size]
                 batch_results = list(executor.map(worker_func, batch, chunksize=chunk_size))
                 self._river_ehs.extend(batch_results)
-                log.info(f"Completed river batch from {i} to {i + chunk_size * max_workers}")
                 gc.collect()  # Force garbage collection after each batch
                 
         log.info("Computing river clusters...")
