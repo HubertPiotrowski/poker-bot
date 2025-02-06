@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 import concurrent.futures
+import multiprocessing
+import gc
 
 import joblib
 import numpy as np
@@ -11,9 +13,38 @@ from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 
+def process_river_ehs_worker(public, cards, n_simulations_river):
+    """
+    Global worker function to compute expected hand strength for a given river combo.
+    This function is defined at module-level so it can be pickled and used with ProcessPoolExecutor.
+    """
+    from poker_ai.clustering.game_utility import GameUtility
+    from poker_ai.clustering.enhanced_evaluator import EnhancedEvaluator
+    evaluator = EnhancedEvaluator(cards)
+    our_hand = public[:2]
+    board = public[2:7]
+    game = GameUtility(our_hand=our_hand, board=board, cards=cards)
+    ehs_squared = evaluator.calculate_ehs_squared(
+        our_hand=game.our_hand,
+        board=game.board,
+        n_samples=n_simulations_river
+    )
+    ppot, npot = evaluator.calculate_potential(
+        our_hand=game.our_hand,
+        board=game.board,
+        n_samples=n_simulations_river
+    )
+    ehs = np.zeros(3)
+    ehs[0] = ehs_squared
+    ehs[1] = 1 - ehs_squared
+    ehs[2] = ppot - npot
+    return ehs
+
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.game_utility import GameUtility
 from poker_ai.clustering.preflop import compute_preflop_lossless_abstraction
+from poker_ai.clustering.enhanced_evaluator import EnhancedEvaluator
+from poker_ai.clustering.advanced_clustering import AdvancedClustering
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
@@ -54,6 +85,8 @@ class CardInfoLutBuilder(CardCombos):
         except FileNotFoundError:
             self.centroids: Dict[str, Any] = {}
             self.card_info_lut: Dict[str, Any] = {}
+        self.enhanced_evaluator = EnhancedEvaluator(self._cards)
+        self.advanced_clustering = AdvancedClustering()
 
     def compute(
         self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int,
@@ -70,20 +103,28 @@ class CardInfoLutBuilder(CardCombos):
                 builder=self
             )
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
+            gc.collect()  # Force garbage collection after dump
+            
         if "river" not in self.card_info_lut:
             self.card_info_lut["river"] = self._compute_river_clusters(
                 n_river_clusters,
             )
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
+            gc.collect()  # Force garbage collection after dump
+            
         if "turn" not in self.card_info_lut:
             self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
+            gc.collect()  # Force garbage collection after dump
+            
         if "flop" not in self.card_info_lut:
             self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
+            gc.collect()  # Force garbage collection after dump
+            
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
@@ -92,20 +133,32 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of river clusters.")
         start = time.time()
         max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            self._river_ehs = list(
-                tqdm(
-                    executor.map(
-                        self.process_river_ehs,
-                        self.river,
-                        chunksize=max(1, len(self.river) // (max_workers * 4)),
-                    ),
-                    total=len(self.river),
-                )
-            )
-        self.centroids["river"], self._river_clusters = self.cluster(
-            num_clusters=n_river_clusters, X=self._river_ehs
+        chunk_size = max(1, min(100, len(self.river) // (max_workers * 4)))  # Limit chunk size
+        log.info(f"River combos count: {len(self.river)}, chunk_size: {chunk_size}, max_workers: {max_workers}")
+        
+        from functools import partial
+        ctx = multiprocessing.get_context("spawn")
+        worker_func = partial(process_river_ehs_worker, cards=self._cards, n_simulations_river=self.n_simulations_river)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            self._river_ehs = []
+            # Process in smaller batches to manage memory
+            for i in range(0, len(self.river), chunk_size * max_workers):
+                log.info(f"Processing river batch from {i} to {i + chunk_size * max_workers}")
+                batch = self.river[i:i + chunk_size * max_workers]
+                batch_results = list(executor.map(worker_func, batch, chunksize=chunk_size))
+                self._river_ehs.extend(batch_results)
+                log.info(f"Completed river batch from {i} to {i + chunk_size * max_workers}")
+                gc.collect()  # Force garbage collection after each batch
+                
+        log.info("Computing river clusters...")
+        centroids, labels = self.advanced_clustering.cluster(
+            self._river_ehs,
+            min_clusters=max(2, n_river_clusters - 5),
+            max_clusters=n_river_clusters + 5
         )
+        self.centroids["river"] = centroids
+        self._river_clusters = labels
+        
         end = time.time()
         log.info(
             f"Finished computation of river clusters - took {end - start} seconds."
@@ -117,20 +170,28 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of turn clusters.")
         start = time.time()
         max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            self._turn_ehs_distributions = list(
-                tqdm(
-                    executor.map(
-                        self.process_turn_ehs_distributions,
-                        self.turn,
-                        chunksize=max(1, len(self.turn) // (max_workers * 4)),
-                    ),
-                    total=len(self.turn),
-                )
-            )
-        self.centroids["turn"], self._turn_clusters = self.cluster(
-            num_clusters=n_turn_clusters, X=self._turn_ehs_distributions
+        chunk_size = max(1, min(100, len(self.turn) // (max_workers * 4)))  # Limit chunk size
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            self._turn_ehs_distributions = []
+            # Process in smaller batches to manage memory
+            for i in range(0, len(self.turn), chunk_size * max_workers):
+                log.info(f"Processing turn batch from {i} to {i + chunk_size * max_workers}")
+                batch = self.turn[i:i + chunk_size * max_workers]
+                batch_results = list(executor.map(self.process_turn_ehs_distributions, batch, chunksize=chunk_size))
+                self._turn_ehs_distributions.extend(batch_results)
+                log.info(f"Completed turn batch from {i} to {i + chunk_size * max_workers}")
+                gc.collect()  # Force garbage collection after each batch
+                
+        log.info("Computing turn clusters...")
+        centroids, labels = self.advanced_clustering.cluster(
+            self._turn_ehs_distributions,
+            min_clusters=max(2, n_turn_clusters - 5),
+            max_clusters=n_turn_clusters + 5
         )
+        self.centroids["turn"] = centroids
+        self._turn_clusters = labels
+        
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
         return self.create_card_lookup(self._turn_clusters, self.turn)
@@ -140,20 +201,27 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of flop clusters.")
         start = time.time()
         max_workers = int(os.environ.get('MAX_WORKERS', os.cpu_count()))
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            self._flop_potential_aware_distributions = list(
-                tqdm(
-                    executor.map(
-                        self.process_flop_potential_aware_distributions,
-                        self.flop,
-                        chunksize=max(1, len(self.flop) // (max_workers * 4)),
-                    ),
-                    total=len(self.flop),
-                )
-            )
-        self.centroids["flop"], self._flop_clusters = self.cluster(
-            num_clusters=n_flop_clusters, X=self._flop_potential_aware_distributions
+        chunk_size = max(1, min(100, len(self.flop) // (max_workers * 4)))  # Limit chunk size
+        
+        ctx = multiprocessing.get_context("spawn")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            self._flop_potential_aware_distributions = []
+            # Process in smaller batches to manage memory
+            for i in range(0, len(self.flop), chunk_size * max_workers):
+                batch = self.flop[i:i + chunk_size * max_workers]
+            batch_results = list(executor.map(self.process_flop_potential_aware_distributions, batch, chunksize=chunk_size))
+            self._flop_potential_aware_distributions.extend(batch_results)
+            gc.collect()  # Force garbage collection after each batch
+                
+        log.info("Computing flop clusters...")
+        centroids, labels = self.advanced_clustering.cluster(
+            self._flop_potential_aware_distributions,
+            min_clusters=max(2, n_flop_clusters - 5),
+            max_clusters=n_flop_clusters + 5
         )
+        self.centroids["flop"] = centroids
+        self._flop_clusters = labels
+        
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
         return self.create_card_lookup(self._flop_clusters, self.flop)
@@ -170,13 +238,24 @@ class CardInfoLutBuilder(CardCombos):
         Returns
         -------
         ehs : np.ndarray
-            [win_rate, loss_rate, tie_rate]
+            [win_rate, loss_rate, potential]
         """
         ehs: np.ndarray = np.zeros(3)
-        for _ in range(self.n_simulations_river):
-            idx: int = game.get_winner()
-            # increment win rate for winner/tie
-            ehs[idx] += 1 / self.n_simulations_river
+        
+        # Calculate E[HS²] and potential
+        ehs_squared = self.enhanced_evaluator.calculate_ehs_squared(
+            our_hand=game.our_hand,
+            board=game.board,
+            n_samples=self.n_simulations_river
+        )
+        ppot, npot = self.enhanced_evaluator.calculate_potential(
+            our_hand=game.our_hand,
+            board=game.board,
+            n_samples=self.n_simulations_river
+        )
+        ehs[0] = ehs_squared
+        ehs[1] = 1 - ehs_squared
+        ehs[2] = ppot - npot  # Store potential in the third component
         return ehs
 
     def simulate_get_turn_ehs_distributions(
@@ -333,21 +412,6 @@ class CardInfoLutBuilder(CardCombos):
             # Now increment the cluster to which it belongs.
             potential_aware_distribution_flop[min_idx] += 1 / self.n_simulations_flop
         return potential_aware_distribution_flop
-
-    @staticmethod
-    def cluster(num_clusters: int, X: np.ndarray):
-        km = KMeans(
-            n_clusters=num_clusters,
-            init="random",
-            n_init=10,
-            max_iter=300,
-            tol=1e-04,
-            random_state=0,
-        )
-        y_km = km.fit_predict(X)
-        # Centers to be used for r - 1 (ie; the previous round)
-        centroids = km.cluster_centers_
-        return centroids, y_km
 
     @staticmethod
     def create_card_lookup(clusters: np.ndarray, card_combos: np.ndarray) -> Dict:
