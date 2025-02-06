@@ -13,6 +13,24 @@ from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 
+def process_flop_ehs_worker(public, cards, n_simulations_flop):
+    """
+    Global worker function to compute expected hand strength for a given flop combo.
+    This function is defined at module-level so it can be pickled and used with ProcessPoolExecutor.
+    """
+    from poker_ai.clustering.game_utility import GameUtility
+    from poker_ai.clustering.enhanced_evaluator import EnhancedEvaluator
+    evaluator = EnhancedEvaluator(cards)
+    our_hand = public[:2]
+    board = public[2:5]  # For flop, board has 3 cards
+    game = GameUtility(our_hand=our_hand, board=board, cards=cards)
+    ehs_squared = evaluator.calculate_ehs_squared(
+        our_hand=game.our_hand,
+        board=game.board,
+        n_samples=n_simulations_flop
+    )
+    return np.array([ehs_squared, 1 - ehs_squared, 0.0])  # No potential calculation for flop
+
 def process_river_ehs_worker(public, cards, n_simulations_river):
     """
     Global worker function to compute expected hand strength for a given river combo.
@@ -236,14 +254,16 @@ class CardInfoLutBuilder(CardCombos):
         chunk_size = max(1, min(100, len(self.flop) // (max_workers * 4)))  # Limit chunk size
         
         ctx = multiprocessing.get_context("spawn")
+        from functools import partial
+        worker_func = partial(process_flop_ehs_worker, cards=self._cards, n_simulations_flop=self.n_simulations_flop)
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
             self._flop_potential_aware_distributions = []
             # Process in smaller batches to manage memory
             for i in range(0, len(self.flop), chunk_size * max_workers):
                 batch = self.flop[i:i + chunk_size * max_workers]
-            batch_results = list(executor.map(self.process_flop_potential_aware_distributions, batch, chunksize=chunk_size))
-            self._flop_potential_aware_distributions.extend(batch_results)
-            gc.collect()  # Force garbage collection after each batch
+                batch_results = list(executor.map(worker_func, batch, chunksize=chunk_size))
+                self._flop_potential_aware_distributions.extend(batch_results)
+                gc.collect()  # Force garbage collection after each batch
                 
         log.info("Computing flop clusters...")
         centroids, labels = self.advanced_clustering.cluster(
